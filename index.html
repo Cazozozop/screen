@@ -1,0 +1,80 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <title>Pixel Infini</title>
+  <style>
+    html, body {
+      margin: 0;
+      padding: 0;
+      overflow: hidden;
+      background: black;
+    }
+    canvas {
+      display: block;
+    }
+  </style>
+</head>
+<body>
+<canvas id="canvas"></canvas>
+
+<script>
+  const canvas = document.getElementById('canvas');
+  const ctx = canvas.getContext('2d');
+  let width = window.innerWidth;
+  let height = window.innerHeight;
+  canvas.width = width;
+  canvas.height = height;
+
+  let zoom = 1;
+  let offsetX = 0;
+  let offsetY = 0;
+
+  function randomColor(x, y) {
+    const h = ((x * 92821 + y * 123457) % 360 + 360) % 360;
+    const s = (Math.abs(Math.sin(x * 0.001 + y * 0.001)) * 100).toFixed(0);
+    const l = (Math.abs(Math.cos(x * 0.002 - y * 0.0015)) * 100).toFixed(0);
+    return `hsl(${h}, ${s}%, ${l}%)`;
+  }
+
+  function draw() {
+    const pixelSize = 1 / zoom;
+    for (let x = 0; x < width; x++) {
+      for (let y = 0; y < height; y++) {
+        const worldX = Math.floor((x - width / 2) * pixelSize + offsetX);
+        const worldY = Math.floor((y - height / 2) * pixelSize + offsetY);
+        ctx.fillStyle = randomColor(worldX, worldY);
+        ctx.fillRect(x, y, 1, 1);
+      }
+    }
+  }
+
+  draw();
+
+  window.addEventListener('resize', () => {
+    width = window.innerWidth;
+    height = window.innerHeight;
+    canvas.width = width;
+    canvas.height = height;
+    draw();
+  });
+
+  canvas.addEventListener('wheel', (e) => {
+    const zoomFactor = 1.1;
+    const oldZoom = zoom;
+    if (e.deltaY < 0) {
+      zoom *= zoomFactor;
+    } else {
+      zoom /= zoomFactor;
+    }
+
+    const mx = e.offsetX - width / 2;
+    const my = e.offsetY - height / 2;
+    offsetX += mx * (1 / oldZoom - 1 / zoom);
+    offsetY += my * (1 / oldZoom - 1 / zoom);
+
+    draw();
+  });
+</script>
+</body>
+</html>
