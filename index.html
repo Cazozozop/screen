@@ -2,13 +2,14 @@
 <html lang="fr">
 <head>
   <meta charset="UTF-8">
-  <title>Pixels Aléatoires Infinis</title>
+  <title>Monde Infini Pixelisé</title>
   <style>
     html, body {
       margin: 0;
       overflow: hidden;
     }
     canvas {
+      image-rendering: pixelated;
       display: block;
     }
   </style>
@@ -16,113 +17,101 @@
 <body>
 <canvas id="canvas"></canvas>
 <script>
-  const canvas = document.getElementById("canvas");
-  const ctx = canvas.getContext("2d");
-  let width = window.innerWidth;
-  let height = window.innerHeight;
-  canvas.width = width;
-  canvas.height = height;
+const canvas = document.getElementById("canvas");
+const ctx = canvas.getContext("2d");
+canvas.width = window.innerWidth;
+canvas.height = window.innerHeight;
 
-  let zoom = 1;
-  let offsetX = 0;
-  let offsetY = 0;
+let width = canvas.width;
+let height = canvas.height;
 
-  // Hash function pour générer un "hasard déterministe"
-  function pseudoRandom(x, y) {
-    let seed = (x * 374761393 + y * 668265263) ^ (x * y);
-    seed = (seed ^ (seed >> 13)) * 1274126177;
-    seed = (seed ^ (seed >> 16));
-    return (seed >>> 0) / 4294967295; // entre 0 et 1
-  }
+// Position et zoom
+let offsetX = 0;
+let offsetY = 0;
+let scale = 16; // taille d’un “pixel” en écran
 
-  function getColor(x, y) {
-    const h = Math.floor(pseudoRandom(x, y) * 360);
-    const s = Math.floor(pseudoRandom(x + 13, y + 17) * 100);
-    const l = Math.floor(pseudoRandom(x - 9, y + 22) * 100);
-    return `hsl(${h}, ${s}%, ${l}%)`;
-  }
+function pseudoRandom(x, y) {
+  let seed = (x * 374761393 + y * 668265263) ^ (x * y);
+  seed = (seed ^ (seed >> 13)) * 1274126177;
+  seed = (seed ^ (seed >> 16));
+  return (seed >>> 0) / 4294967295;
+}
 
-  function draw() {
-    const imageData = ctx.createImageData(width, height);
-    const data = imageData.data;
-    const pixelSize = 1 / zoom;
+function getColor(x, y) {
+  const h = Math.floor(pseudoRandom(x, y) * 360);
+  const s = Math.floor(pseudoRandom(x + 13, y + 17) * 100);
+  const l = Math.floor(pseudoRandom(x - 9, y + 22) * 100);
+  return `hsl(${h}, ${s}%, ${l}%)`;
+}
 
-    for (let y = 0; y < height; y++) {
-      for (let x = 0; x < width; x++) {
-        const worldX = Math.floor((x - width / 2) * pixelSize + offsetX);
-        const worldY = Math.floor((y - height / 2) * pixelSize + offsetY);
-        const h = Math.floor(pseudoRandom(worldX, worldY) * 360);
-        const s = pseudoRandom(worldX + 111, worldY + 91);
-        const l = pseudoRandom(worldX - 78, worldY + 42);
-        const color = hslToRgb(h, s, l);
+function draw() {
+  ctx.clearRect(0, 0, width, height);
 
-        const index = (y * width + x) * 4;
-        data[index] = color[0];
-        data[index + 1] = color[1];
-        data[index + 2] = color[2];
-        data[index + 3] = 255;
-      }
+  const startX = Math.floor(offsetX);
+  const startY = Math.floor(offsetY);
+  const endX = Math.ceil(offsetX + width / scale);
+  const endY = Math.ceil(offsetY + height / scale);
+
+  for (let x = startX; x < endX; x++) {
+    for (let y = startY; y < endY; y++) {
+      ctx.fillStyle = getColor(x, y);
+      const screenX = (x - offsetX) * scale;
+      const screenY = (y - offsetY) * scale;
+      ctx.fillRect(screenX, screenY, scale, scale);
     }
-
-    ctx.putImageData(imageData, 0, 0);
   }
+}
 
-  function hslToRgb(h, s, l) {
-    h = h / 360;
-    s = s;
-    l = l;
+// Zoom avec molette
+canvas.addEventListener("wheel", (e) => {
+  const zoom = e.deltaY < 0 ? 1.1 : 0.9;
+  const mouseX = e.offsetX;
+  const mouseY = e.offsetY;
 
-    let r, g, b;
+  const worldX = offsetX + mouseX / scale;
+  const worldY = offsetY + mouseY / scale;
 
-    if (s === 0) {
-      r = g = b = l;
-    } else {
-      const hue2rgb = (p, q, t) => {
-        if (t < 0) t += 1;
-        if (t > 1) t -= 1;
-        if (t < 1/6) return p + (q - p) * 6 * t;
-        if (t < 1/2) return q;
-        if (t < 2/3) return p + (q - p) * (2/3 - t) * 6;
-        return p;
-      };
-      const q = l < 0.5 ? l * (1 + s) : l + s - l * s;
-      const p = 2 * l - q;
-      r = hue2rgb(p, q, h + 1/3);
-      g = hue2rgb(p, q, h);
-      b = hue2rgb(p, q, h - 1/3);
-    }
+  scale *= zoom;
+  if (scale < 1) scale = 1; // limite minimal
 
-    return [Math.floor(r * 255), Math.floor(g * 255), Math.floor(b * 255)];
-  }
-
-  window.addEventListener("resize", () => {
-    width = window.innerWidth;
-    height = window.innerHeight;
-    canvas.width = width;
-    canvas.height = height;
-    draw();
-  });
-
-  canvas.addEventListener("wheel", (e) => {
-    const zoomFactor = 1.1;
-    const mx = e.offsetX - width / 2;
-    const my = e.offsetY - height / 2;
-    const wx = offsetX + mx / zoom;
-    const wy = offsetY + my / zoom;
-
-    if (e.deltaY < 0) {
-      zoom *= zoomFactor;
-    } else {
-      zoom /= zoomFactor;
-    }
-
-    offsetX = wx - mx / zoom;
-    offsetY = wy - my / zoom;
-
-    draw();
-  });
+  offsetX = worldX - mouseX / scale;
+  offsetY = worldY - mouseY / scale;
 
   draw();
+});
+
+// Déplacement à la souris
+let dragging = false;
+let lastX, lastY;
+canvas.addEventListener("mousedown", (e) => {
+  dragging = true;
+  lastX = e.clientX;
+  lastY = e.clientY;
+});
+canvas.addEventListener("mousemove", (e) => {
+  if (dragging) {
+    const dx = e.clientX - lastX;
+    const dy = e.clientY - lastY;
+    offsetX -= dx / scale;
+    offsetY -= dy / scale;
+    lastX = e.clientX;
+    lastY = e.clientY;
+    draw();
+  }
+});
+canvas.addEventListener("mouseup", () => dragging = false);
+canvas.addEventListener("mouseleave", () => dragging = false);
+
+// Resize
+window.addEventListener("resize", () => {
+  width = window.innerWidth;
+  height = window.innerHeight;
+  canvas.width = width;
+  canvas.height = height;
+  draw();
+});
+
+draw();
 </script>
 </body>
 </html>
