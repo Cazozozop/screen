@@ -6,7 +6,8 @@
   <style>
     body { background: #222; color: #fff; font-family: sans-serif; padding: 20px; }
     input, button { margin: 10px 0; display: block; }
-    #preview { margin-top: 20px; max-width: 100%; }
+    #preview, .thumb { margin-top: 20px; max-width: 100%; }
+    #thumbs img { margin: 5px; max-height: 100px; border: 1px solid #555; }
   </style>
 </head>
 <body>
@@ -17,6 +18,7 @@
   <input type="number" id="delay" value="200">
   <button id="generate" disabled>Générer le GIF</button>
   <div id="status"></div>
+  <div id="thumbs"></div>
   <img id="preview" />
   <a id="download" style="display:none" download="gif_final.gif">📥 Télécharger le GIF</a>
 
@@ -27,11 +29,13 @@
     const preview = document.getElementById('preview');
     const download = document.getElementById('download');
     const status = document.getElementById('status');
+    const thumbs = document.getElementById('thumbs');
     const delayInput = document.getElementById('delay');
 
     let imageURLs = [];
 
     input.addEventListener('change', () => {
+      thumbs.innerHTML = '';
       const files = Array.from(input.files).sort((a, b) =>
         a.name.localeCompare(b.name, undefined, { numeric: true })
       );
@@ -39,7 +43,13 @@
       const readers = files.map(file => {
         return new Promise(resolve => {
           const reader = new FileReader();
-          reader.onload = e => resolve(e.target.result);
+          reader.onload = e => {
+            // créer une miniature
+            const img = document.createElement('img');
+            img.src = e.target.result;
+            thumbs.appendChild(img);
+            resolve(e.target.result);
+          };
           reader.readAsDataURL(file);
         });
       });
