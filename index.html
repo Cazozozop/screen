@@ -2,73 +2,82 @@
 <html lang="fr">
 <head>
   <meta charset="UTF-8">
-  <title>Générateur de GIF avec transparence</title>
+  <title>GIF Transparent Generator</title>
   <style>
     body { font-family: sans-serif; padding: 20px; background: #222; color: white; }
     input, button { margin: 10px 0; }
-    #preview { margin-top: 20px; max-width: 100%; }
+    #generate, #downloadLink { display: none; }
+    #preview { margin-top: 20px; max-width: 100%; border: 1px solid #444; }
   </style>
 </head>
 <body>
-  <h1>GIF Maker (transparence + tri)</h1>
+  <h1>Créateur de GIF avec transparence</h1>
   <input type="file" id="images" multiple accept="image/*">
   <br>
-  <label>Vitesse (ms par image) : <input type="number" id="delay" value="200"></label>
+  <label>Vitesse (ms/image) : <input type="number" id="delay" value="200"></label>
   <br>
-  <button id="generate">Générer le GIF</button>
+  <button id="generate">🧪 Générer le GIF</button>
   <br>
-  <a id="downloadLink" style="display:none" download="result.gif">📥 Télécharger le GIF</a>
+  <a id="downloadLink" download="mon_gif.gif">📥 Télécharger le GIF</a>
   <br>
-  <img id="preview" alt="Aperçu GIF" />
+  <img id="preview" alt="Aperçu du GIF" />
 
   <script src="https://cdnjs.cloudflare.com/ajax/libs/gif.js/0.2.0/gif.js"></script>
   <script>
     const input = document.getElementById("images");
+    const generateBtn = document.getElementById("generate");
     const delayInput = document.getElementById("delay");
     const preview = document.getElementById("preview");
     const downloadLink = document.getElementById("downloadLink");
 
-    document.getElementById("generate").addEventListener("click", async () => {
-      const files = Array.from(input.files);
-      if (files.length === 0) return alert("Importe au moins une image.");
+    let filesSorted = [];
 
-      // Tri alphabétique
-      files.sort((a, b) => a.name.localeCompare(b.name, undefined, { numeric: true }));
+    input.addEventListener("change", () => {
+      if (input.files.length === 0) return;
+      filesSorted = Array.from(input.files).sort((a, b) => a.name.localeCompare(b.name, undefined, { numeric: true }));
+      generateBtn.style.display = "inline-block";
+    });
+
+    generateBtn.addEventListener("click", async () => {
+      if (filesSorted.length === 0) return alert("Aucune image sélectionnée.");
+
+      const delay = parseInt(delayInput.value) || 200;
 
       const gif = new GIF({
         workers: 2,
-        quality: 10,
-        transparent: 'rgba(0,0,0,0)', // gère transparence
+        quality: 1,
+        transparent: 0x00000000,
         workerScript: 'https://cdnjs.cloudflare.com/ajax/libs/gif.js/0.2.0/gif.worker.js'
       });
 
-      const delay = parseInt(delayInput.value);
-
-      for (const file of files) {
+      for (const file of filesSorted) {
         const img = await loadImage(file);
         const canvas = document.createElement("canvas");
         canvas.width = img.width;
         canvas.height = img.height;
-        const ctx = canvas.getContext("2d");
-        ctx.clearRect(0, 0, canvas.width, canvas.height); // important pour la transparence
+        const ctx = canvas.getContext("2d", { alpha: true });
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
         ctx.drawImage(img, 0, 0);
         gif.addFrame(ctx, {copy: true, delay: delay});
       }
 
+      generateBtn.textContent = "⏳ Génération...";
       gif.on("finished", blob => {
         const url = URL.createObjectURL(blob);
         preview.src = url;
         downloadLink.href = url;
-        downloadLink.style.display = "inline";
+        downloadLink.style.display = "inline-block";
+        generateBtn.textContent = "🧪 Générer le GIF";
       });
 
       gif.render();
     });
 
     function loadImage(file) {
-      return new Promise((resolve) => {
+      return new Promise((resolve, reject) => {
         const img = new Image();
         img.onload = () => resolve(img);
+        img.onerror = () => reject(`Impossible de charger ${file.name}`);
         img.src = URL.createObjectURL(file);
       });
     }
