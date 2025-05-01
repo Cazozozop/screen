@@ -2,87 +2,77 @@
 <html lang="fr">
 <head>
   <meta charset="UTF-8">
-  <title>GIF Transparent Generator</title>
+  <title>Créateur de GIF</title>
   <style>
-    body { font-family: sans-serif; background: #111; color: white; padding: 20px; }
-    input, button, label { margin: 10px 0; display: block; }
-    #generate, #downloadLink { display: none; }
-    #preview { margin-top: 20px; max-width: 100%; border: 1px solid #444; }
+    body { background: #222; color: #fff; font-family: sans-serif; padding: 20px; }
+    input, button { margin: 10px 0; display: block; }
+    #preview { margin-top: 20px; max-width: 100%; }
   </style>
 </head>
 <body>
-  <h2>Créer un GIF avec transparence</h2>
+  <h1>Créer un GIF avec transparence</h1>
+
   <input type="file" id="images" multiple accept="image/*">
   <label for="delay">Vitesse (ms/image):</label>
-  <input type="number" id="delay" value="200" min="10" max="10000">
-  <button id="generate">🧪 Générer le GIF</button>
-  <a id="downloadLink" download="mon_gif.gif">📥 Télécharger le GIF</a>
-  <br>
-  <img id="preview" alt="Aperçu GIF" />
+  <input type="number" id="delay" value="200">
+  <button id="generate" disabled>Générer le GIF</button>
+  <div id="status"></div>
+  <img id="preview" />
+  <a id="download" style="display:none" download="gif_final.gif">📥 Télécharger le GIF</a>
 
-  <script src="https://unpkg.com/gif.js.optimized/dist/gif.worker.js"></script>
-  <script src="https://unpkg.com/gif.js.optimized/dist/gif.js"></script>
-
+  <script src="https://cdn.jsdelivr.net/npm/gifshot@0.3.2/build/gifshot.min.js"></script>
   <script>
-    const input = document.getElementById("images");
-    const generateBtn = document.getElementById("generate");
-    const delayInput = document.getElementById("delay");
-    const preview = document.getElementById("preview");
-    const downloadLink = document.getElementById("downloadLink");
+    const input = document.getElementById('images');
+    const generateBtn = document.getElementById('generate');
+    const preview = document.getElementById('preview');
+    const download = document.getElementById('download');
+    const status = document.getElementById('status');
+    const delayInput = document.getElementById('delay');
 
-    let files = [];
+    let imageURLs = [];
 
-    input.addEventListener("change", () => {
-      files = Array.from(input.files).sort((a, b) =>
-        a.name.localeCompare(b.name, undefined, { numeric: true, sensitivity: 'base' })
+    input.addEventListener('change', () => {
+      const files = Array.from(input.files).sort((a, b) =>
+        a.name.localeCompare(b.name, undefined, { numeric: true })
       );
-      generateBtn.style.display = files.length ? "inline-block" : "none";
+
+      const readers = files.map(file => {
+        return new Promise(resolve => {
+          const reader = new FileReader();
+          reader.onload = e => resolve(e.target.result);
+          reader.readAsDataURL(file);
+        });
+      });
+
+      Promise.all(readers).then(results => {
+        imageURLs = results;
+        generateBtn.disabled = false;
+      });
     });
 
-    generateBtn.addEventListener("click", async () => {
-      if (!files.length) return alert("Importe des images d'abord.");
+    generateBtn.addEventListener('click', () => {
+      status.textContent = "⏳ Génération en cours...";
+      preview.src = "";
+      download.style.display = "none";
 
-      const delay = parseInt(delayInput.value);
-      const firstImg = await loadImage(files[0]);
-      const gif = new GIF({
-        workers: 2,
-        width: firstImg.width,
-        height: firstImg.height,
-        workerScript: 'https://unpkg.com/gif.js.optimized/dist/gif.worker.js',
-        transparent: 0x00FF00, // couleur bidon (sera remplacée par canvas alpha)
+      gifshot.createGIF({
+        images: imageURLs,
+        gifWidth: 400,
+        gifHeight: 400,
+        interval: parseInt(delayInput.value) / 1000,
+        transparent: 'rgba(0,0,0,0)',
+        preserveTransparency: true
+      }, function (obj) {
+        if (!obj.error) {
+          preview.src = obj.image;
+          download.href = obj.image;
+          download.style.display = "inline-block";
+          status.textContent = "✅ GIF prêt !";
+        } else {
+          status.textContent = "❌ Erreur : " + obj.error;
+        }
       });
-
-      for (const file of files) {
-        const img = await loadImage(file);
-        const canvas = document.createElement("canvas");
-        canvas.width = firstImg.width;
-        canvas.height = firstImg.height;
-        const ctx = canvas.getContext("2d");
-        ctx.clearRect(0, 0, canvas.width, canvas.height);
-        ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
-        gif.addFrame(canvas, { delay, copy: true });
-      }
-
-      generateBtn.textContent = "⏳ En cours...";
-      gif.on("finished", (blob) => {
-        const url = URL.createObjectURL(blob);
-        preview.src = url;
-        downloadLink.href = url;
-        downloadLink.style.display = "inline-block";
-        generateBtn.textContent = "🧪 Générer le GIF";
-      });
-
-      gif.render();
     });
-
-    function loadImage(file) {
-      return new Promise((resolve, reject) => {
-        const img = new Image();
-        img.onload = () => resolve(img);
-        img.onerror = reject;
-        img.src = URL.createObjectURL(file);
-      });
-    }
   </script>
 </body>
 </html>
