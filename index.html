@@ -2,116 +2,76 @@
 <html lang="fr">
 <head>
   <meta charset="UTF-8">
-  <title>Monde Infini Pixelisé</title>
+  <title>Générateur de GIF avec transparence</title>
   <style>
-    html, body {
-      margin: 0;
-      overflow: hidden;
-    }
-    canvas {
-      image-rendering: pixelated;
-      display: block;
-    }
+    body { font-family: sans-serif; padding: 20px; background: #222; color: white; }
+    input, button { margin: 10px 0; }
+    #preview { margin-top: 20px; max-width: 100%; }
   </style>
 </head>
 <body>
-<canvas id="canvas"></canvas>
-<script>
-const canvas = document.getElementById("canvas");
-const ctx = canvas.getContext("2d");
-canvas.width = window.innerWidth;
-canvas.height = window.innerHeight;
+  <h1>GIF Maker (transparence + tri)</h1>
+  <input type="file" id="images" multiple accept="image/*">
+  <br>
+  <label>Vitesse (ms par image) : <input type="number" id="delay" value="200"></label>
+  <br>
+  <button id="generate">Générer le GIF</button>
+  <br>
+  <a id="downloadLink" style="display:none" download="result.gif">📥 Télécharger le GIF</a>
+  <br>
+  <img id="preview" alt="Aperçu GIF" />
 
-let width = canvas.width;
-let height = canvas.height;
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/gif.js/0.2.0/gif.js"></script>
+  <script>
+    const input = document.getElementById("images");
+    const delayInput = document.getElementById("delay");
+    const preview = document.getElementById("preview");
+    const downloadLink = document.getElementById("downloadLink");
 
-// Position et zoom
-let offsetX = 0;
-let offsetY = 0;
-let scale = 16; // taille d’un “pixel” en écran
+    document.getElementById("generate").addEventListener("click", async () => {
+      const files = Array.from(input.files);
+      if (files.length === 0) return alert("Importe au moins une image.");
 
-function pseudoRandom(x, y) {
-  let seed = (x * 374761393 + y * 668265263) ^ (x * y);
-  seed = (seed ^ (seed >> 13)) * 1274126177;
-  seed = (seed ^ (seed >> 16));
-  return (seed >>> 0) / 4294967295;
-}
+      // Tri alphabétique
+      files.sort((a, b) => a.name.localeCompare(b.name, undefined, { numeric: true }));
 
-function getColor(x, y) {
-  const h = Math.floor(pseudoRandom(x, y) * 360);
-  const s = Math.floor(pseudoRandom(x + 13, y + 17) * 100);
-  const l = Math.floor(pseudoRandom(x - 9, y + 22) * 100);
-  return `hsl(${h}, ${s}%, ${l}%)`;
-}
+      const gif = new GIF({
+        workers: 2,
+        quality: 10,
+        transparent: 'rgba(0,0,0,0)', // gère transparence
+        workerScript: 'https://cdnjs.cloudflare.com/ajax/libs/gif.js/0.2.0/gif.worker.js'
+      });
 
-function draw() {
-  ctx.clearRect(0, 0, width, height);
+      const delay = parseInt(delayInput.value);
 
-  const startX = Math.floor(offsetX);
-  const startY = Math.floor(offsetY);
-  const endX = Math.ceil(offsetX + width / scale);
-  const endY = Math.ceil(offsetY + height / scale);
+      for (const file of files) {
+        const img = await loadImage(file);
+        const canvas = document.createElement("canvas");
+        canvas.width = img.width;
+        canvas.height = img.height;
+        const ctx = canvas.getContext("2d");
+        ctx.clearRect(0, 0, canvas.width, canvas.height); // important pour la transparence
+        ctx.drawImage(img, 0, 0);
+        gif.addFrame(ctx, {copy: true, delay: delay});
+      }
 
-  for (let x = startX; x < endX; x++) {
-    for (let y = startY; y < endY; y++) {
-      ctx.fillStyle = getColor(x, y);
-      const screenX = (x - offsetX) * scale;
-      const screenY = (y - offsetY) * scale;
-      ctx.fillRect(screenX, screenY, scale, scale);
+      gif.on("finished", blob => {
+        const url = URL.createObjectURL(blob);
+        preview.src = url;
+        downloadLink.href = url;
+        downloadLink.style.display = "inline";
+      });
+
+      gif.render();
+    });
+
+    function loadImage(file) {
+      return new Promise((resolve) => {
+        const img = new Image();
+        img.onload = () => resolve(img);
+        img.src = URL.createObjectURL(file);
+      });
     }
-  }
-}
-
-// Zoom avec molette
-canvas.addEventListener("wheel", (e) => {
-  const zoom = e.deltaY < 0 ? 1.1 : 0.9;
-  const mouseX = e.offsetX;
-  const mouseY = e.offsetY;
-
-  const worldX = offsetX + mouseX / scale;
-  const worldY = offsetY + mouseY / scale;
-
-  scale *= zoom;
-  if (scale < 1) scale = 1; // limite minimal
-
-  offsetX = worldX - mouseX / scale;
-  offsetY = worldY - mouseY / scale;
-
-  draw();
-});
-
-// Déplacement à la souris
-let dragging = false;
-let lastX, lastY;
-canvas.addEventListener("mousedown", (e) => {
-  dragging = true;
-  lastX = e.clientX;
-  lastY = e.clientY;
-});
-canvas.addEventListener("mousemove", (e) => {
-  if (dragging) {
-    const dx = e.clientX - lastX;
-    const dy = e.clientY - lastY;
-    offsetX -= dx / scale;
-    offsetY -= dy / scale;
-    lastX = e.clientX;
-    lastY = e.clientY;
-    draw();
-  }
-});
-canvas.addEventListener("mouseup", () => dragging = false);
-canvas.addEventListener("mouseleave", () => dragging = false);
-
-// Resize
-window.addEventListener("resize", () => {
-  width = window.innerWidth;
-  height = window.innerHeight;
-  canvas.width = width;
-  canvas.height = height;
-  draw();
-});
-
-draw();
-</script>
+  </script>
 </body>
 </html>
