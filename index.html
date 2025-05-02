@@ -2,16 +2,21 @@
 <html lang="fr">
 <head>
   <meta charset="UTF-8">
-  <title>Créateur de GIF</title>
+  <title>Créateur de GIF Pixelisé</title>
   <style>
     body { background: #222; color: #fff; font-family: sans-serif; padding: 20px; }
     input, button { margin: 10px 0; display: block; }
-    #preview, .thumb { margin-top: 20px; max-width: 100%; }
-    #thumbs img { margin: 5px; max-height: 100px; border: 1px solid #555; }
+    #preview, .thumb { margin-top: 20px; max-width: 100%; image-rendering: pixelated; }
+    #thumbs img {
+      margin: 5px;
+      max-height: 100px;
+      border: 1px solid #555;
+      image-rendering: pixelated;
+    }
   </style>
 </head>
 <body>
-  <h1>Créer un GIF avec transparence</h1>
+  <h1>Créer un GIF avec transparence (pixelisé)</h1>
 
   <input type="file" id="images" multiple accept="image/*">
   <label for="delay">Vitesse (ms/image):</label>
@@ -44,9 +49,9 @@
         return new Promise(resolve => {
           const reader = new FileReader();
           reader.onload = e => {
-            // créer une miniature
             const img = document.createElement('img');
             img.src = e.target.result;
+            img.style.imageRendering = 'pixelated';
             thumbs.appendChild(img);
             resolve(e.target.result);
           };
@@ -75,6 +80,7 @@
       }, function (obj) {
         if (!obj.error) {
           preview.src = obj.image;
+          preview.style.imageRendering = 'pixelated';
           download.href = obj.image;
           download.style.display = "inline-block";
           status.textContent = "✅ GIF prêt !";
