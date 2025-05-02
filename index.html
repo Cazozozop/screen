@@ -2,30 +2,30 @@
 <html lang="fr">
 <head>
   <meta charset="UTF-8">
-  <title>Créateur de GIF Pixelisé</title>
+  <title>GIF Pixel Art</title>
   <style>
     body { background: #222; color: #fff; font-family: sans-serif; padding: 20px; }
     input, button { margin: 10px 0; display: block; }
-    #preview, .thumb { margin-top: 20px; max-width: 100%; image-rendering: pixelated; }
-    #thumbs img {
-      margin: 5px;
-      max-height: 100px;
-      border: 1px solid #555;
+    #thumbs img, #preview {
       image-rendering: pixelated;
+      image-rendering: crisp-edges;
+      max-height: 100px;
+      margin: 5px;
+      border: 1px solid #555;
     }
   </style>
 </head>
 <body>
-  <h1>Créer un GIF avec transparence (pixelisé)</h1>
+  <h1>Créer un GIF pixelisé avec transparence</h1>
 
   <input type="file" id="images" multiple accept="image/*">
   <label for="delay">Vitesse (ms/image):</label>
   <input type="number" id="delay" value="200">
-  <button id="generate" disabled>Générer le GIF</button>
+  <button id="generate" disabled>🎞️ Générer le GIF</button>
   <div id="status"></div>
   <div id="thumbs"></div>
   <img id="preview" />
-  <a id="download" style="display:none" download="gif_final.gif">📥 Télécharger le GIF</a>
+  <a id="download" style="display:none" download="gif_final.gif">📥 Télécharger</a>
 
   <script src="https://cdn.jsdelivr.net/npm/gifshot@0.3.2/build/gifshot.min.js"></script>
   <script>
@@ -51,7 +51,6 @@
           reader.onload = e => {
             const img = document.createElement('img');
             img.src = e.target.result;
-            img.style.imageRendering = 'pixelated';
             thumbs.appendChild(img);
             resolve(e.target.result);
           };
@@ -66,21 +65,21 @@
     });
 
     generateBtn.addEventListener('click', () => {
-      status.textContent = "⏳ Génération en cours...";
+      status.textContent = "⏳ Génération...";
       preview.src = "";
       download.style.display = "none";
 
       gifshot.createGIF({
         images: imageURLs,
-        gifWidth: 400,
-        gifHeight: 400,
         interval: parseInt(delayInput.value) / 1000,
+        preserveTransparency: true,
         transparent: 'rgba(0,0,0,0)',
-        preserveTransparency: true
+        pixelRatio: 1,
+        sampleInterval: 10,
+        numWorkers: 2
       }, function (obj) {
         if (!obj.error) {
           preview.src = obj.image;
-          preview.style.imageRendering = 'pixelated';
           download.href = obj.image;
           download.style.display = "inline-block";
           status.textContent = "✅ GIF prêt !";
