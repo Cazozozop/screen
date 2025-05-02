@@ -2,121 +2,111 @@
 <html lang="fr">
 <head>
   <meta charset="UTF-8">
-  <title>GIF pixelisé rapide</title>
+  <title>Créateur de GIF pixelisé</title>
   <style>
     body {
       background: #111;
-      color: #fff;
+      color: white;
       font-family: sans-serif;
       padding: 20px;
     }
-    img.preview {
+    canvas {
       image-rendering: pixelated;
-      width: auto;
+      border: 1px solid #555;
+      margin-top: 10px;
+    }
+    #thumbs img {
       height: 64px;
       margin: 4px;
-      border: 1px solid #444;
-      background: #222;
-    }
-    #thumbs {
-      display: flex;
-      flex-wrap: wrap;
-      margin-top: 10px;
+      image-rendering: pixelated;
     }
   </style>
 </head>
 <body>
-  <h1>GIF pixelisé + rapide</h1>
 
-  <input type="file" id="images" multiple accept="image/*"><br>
-  <label>Vitesse (ms/image) : </label>
-  <input type="number" id="delay" value="200"><br><br>
-  <button id="generate" disabled>🎞️ Générer le GIF</button>
+<h1>Créateur de GIF pixelisé</h1>
 
-  <div id="thumbs"></div>
-  <p id="status"></p>
-  <img id="result" />
-  <br><a id="download" download="gif_pixel.gif" style="display:none">📥 Télécharger le GIF</a>
+<input type="file" id="images" multiple accept="image/*">
+<br><br>
+<label>Vitesse (ms/image):</label>
+<input type="number" id="delay" value="200"><br><br>
+<button id="generateBtn">🎞️ Générer le GIF</button>
+<a id="downloadLink" style="display:none" download="animation.gif">📥 Télécharger le GIF</a>
 
-  <script src="https://cdn.jsdelivr.net/npm/gif.js.optimized/dist/gif.js"></script>
-  <script>
-    const input = document.getElementById('images');
-    const generate = document.getElementById('generate');
-    const thumbs = document.getElementById('thumbs');
-    const delay = document.getElementById('delay');
-    const result = document.getElementById('result');
-    const download = document.getElementById('download');
-    const status = document.getElementById('status');
+<canvas id="canvas"></canvas>
+<div id="thumbs"></div>
+<p id="status"></p>
 
-    let images = [];
+<script src="https://cdnjs.cloudflare.com/ajax/libs/gif.js/0.2.0/gif.js"></script>
+<script>
+const input = document.getElementById('images');
+const delayInput = document.getElementById('delay');
+const canvas = document.getElementById('canvas');
+const ctx = canvas.getContext('2d');
+const thumbs = document.getElementById('thumbs');
+const status = document.getElementById('status');
+const generateBtn = document.getElementById('generateBtn');
+const downloadLink = document.getElementById('downloadLink');
 
-    input.addEventListener('change', async () => {
-      thumbs.innerHTML = '';
-      images = [];
-      generate.disabled = true;
-      status.textContent = "🖼️ Chargement des images...";
+let frames = [];
 
-      const files = Array.from(input.files).sort((a, b) =>
-        a.name.localeCompare(b.name, undefined, { numeric: true })
-      );
+input.addEventListener('change', async () => {
+  thumbs.innerHTML = '';
+  frames = [];
+  status.textContent = "📂 Chargement des images...";
+  const files = Array.from(input.files).sort((a, b) => a.name.localeCompare(b.name, undefined, {numeric: true}));
 
-      for (const file of files) {
-        const img = new Image();
-        img.classList.add('preview');
-        img.src = URL.createObjectURL(file);
-        await new Promise((resolve) => {
-          img.onload = () => {
-            images.push(img);
-            thumbs.appendChild(img);
-            resolve();
-          };
-        });
-      }
-
-      status.textContent = `✅ ${images.length} image(s) prêtes.`;
-      generate.disabled = false;
+  for (const file of files) {
+    const img = new Image();
+    img.src = URL.createObjectURL(file);
+    await new Promise(resolve => {
+      img.onload = () => {
+        frames.push(img);
+        const thumb = img.cloneNode();
+        thumbs.appendChild(thumb);
+        resolve();
+      };
     });
+  }
 
-    generate.addEventListener('click', () => {
-      if (images.length === 0) return;
+  if (frames.length > 0) {
+    canvas.width = frames[0].width;
+    canvas.height = frames[0].height;
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    ctx.drawImage(frames[0], 0, 0);
+  }
 
-      status.textContent = "⏳ Génération du GIF... (peut prendre quelques secondes)";
+  status.textContent = `✅ ${frames.length} image(s) chargée(s)`;
+});
 
-      const gif = new GIF({
-        workers: 4, // plus de workers = plus rapide
-        workerScript: 'https://cdn.jsdelivr.net/npm/gif.js.optimized/dist/gif.worker.js',
-        quality: 1,
-        background: 'rgba(0,0,0,0)', // Fond transparent
-        transparent: 0x00FF00, // hack pour accélérer (vert fluo non utilisé)
-        width: images[0].width,
-        height: images[0].height
-      });
+generateBtn.addEventListener('click', () => {
+  if (frames.length === 0) return alert("Charge des images d'abord !");
+  status.textContent = "⏳ Génération du GIF en cours...";
+  downloadLink.style.display = 'none';
 
-      const canvas = document.createElement('canvas');
-      const ctx = canvas.getContext('2d');
+  const gif = new GIF({
+    workers: 2,
+    quality: 1,
+    workerScript: 'https://cdnjs.cloudflare.com/ajax/libs/gif.js/0.2.0/gif.worker.js',
+    transparent: 0x00FF00, // Couleur verte improbable pour assurer la transparence
+  });
 
-      const w = images[0].width;
-      const h = images[0].height;
-      canvas.width = w;
-      canvas.height = h;
+  frames.forEach(img => {
+    ctx.clearRect(0, 0, canvas.width, canvas.height); // empêche la superposition
+    ctx.drawImage(img, 0, 0);
+    gif.addFrame(ctx, {copy: true, delay: parseInt(delayInput.value)});
+  });
 
-      for (const img of images) {
-        ctx.clearRect(0, 0, w, h);
-        ctx.drawImage(img, 0, 0);
-        gif.addFrame(canvas, { copy: true, delay: parseInt(delay.value) });
-      }
+  gif.on('finished', function(blob) {
+    const url = URL.createObjectURL(blob);
+    downloadLink.href = url;
+    downloadLink.style.display = 'inline-block';
+    status.textContent = "✅ GIF prêt à être téléchargé !";
+  });
 
-      gif.on('finished', blob => {
-        const url = URL.createObjectURL(blob);
-        result.src = url;
-        result.style.display = 'inline-block';
-        download.href = url;
-        download.style.display = 'inline-block';
-        status.textContent = "✅ GIF généré !";
-      });
+  gif.render();
+});
+</script>
 
-      gif.render();
-    });
-  </script>
 </body>
 </html>
