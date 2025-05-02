@@ -2,7 +2,7 @@
 <html lang="fr">
 <head>
   <meta charset="UTF-8">
-  <title>GIF pixelisé</title>
+  <title>Animation pixelisée</title>
   <style>
     body {
       background: #111;
@@ -10,16 +10,17 @@
       font-family: sans-serif;
       padding: 20px;
     }
-    img.preview {
+    canvas {
       image-rendering: pixelated;
-      width: auto;
+      background: transparent;
+      border: 1px solid #555;
+    }
+    #thumbs img {
+      image-rendering: pixelated;
       height: 64px;
       margin: 4px;
       border: 1px solid #444;
       background: #222;
-    }
-    canvas {
-      display: none;
     }
     #thumbs {
       display: flex;
@@ -29,94 +30,77 @@
   </style>
 </head>
 <body>
-  <h1>GIF pixelisé avec transparence</h1>
 
-  <input type="file" id="images" multiple accept="image/*"><br>
-  <label>Vitesse (ms/image) : </label>
-  <input type="number" id="delay" value="200"><br><br>
-  <button id="generate" disabled>🎞️ Générer le GIF</button>
+<h1>Animation pixelisée instantanée</h1>
 
-  <div id="thumbs"></div>
-  <p id="status"></p>
-  <img id="result" />
-  <br><a id="download" download="gif_pixel.gif" style="display:none">📥 Télécharger le GIF</a>
+<input type="file" id="images" multiple accept="image/*"><br>
+<label>Vitesse (ms/image) :</label>
+<input type="number" id="delay" value="200"><br><br>
 
-  <script src="https://cdn.jsdelivr.net/npm/gif.js.optimized/dist/gif.js"></script>
-  <script>
-    const input = document.getElementById('images');
-    const generate = document.getElementById('generate');
-    const thumbs = document.getElementById('thumbs');
-    const delay = document.getElementById('delay');
-    const result = document.getElementById('result');
-    const download = document.getElementById('download');
-    const status = document.getElementById('status');
+<canvas id="canvas"></canvas>
+<div id="thumbs"></div>
+<p id="status"></p>
 
-    let images = [];
+<script>
+const input = document.getElementById('images');
+const delayInput = document.getElementById('delay');
+const canvas = document.getElementById('canvas');
+const ctx = canvas.getContext('2d');
+const thumbs = document.getElementById('thumbs');
+const status = document.getElementById('status');
 
-    input.addEventListener('change', async () => {
-      thumbs.innerHTML = '';
-      images = [];
-      generate.disabled = true;
-      status.textContent = "🖼️ Chargement des images...";
+let frames = [];
+let currentFrame = 0;
+let timer = null;
 
-      const files = Array.from(input.files).sort((a, b) =>
-        a.name.localeCompare(b.name, undefined, { numeric: true })
-      );
+input.addEventListener('change', async () => {
+  thumbs.innerHTML = '';
+  frames = [];
+  status.textContent = "🖼️ Chargement des images...";
+  if (timer) clearInterval(timer);
 
-      for (const file of files) {
-        const img = new Image();
-        img.classList.add('preview');
-        img.src = URL.createObjectURL(file);
-        await new Promise((resolve) => {
-          img.onload = () => {
-            images.push(img);
-            thumbs.appendChild(img);
-            resolve();
-          };
-        });
-      }
+  const files = Array.from(input.files).sort((a, b) =>
+    a.name.localeCompare(b.name, undefined, { numeric: true })
+  );
 
-      status.textContent = `✅ ${images.length} image(s) prêtes.`;
-      generate.disabled = false;
+  for (const file of files) {
+    const img = new Image();
+    img.src = URL.createObjectURL(file);
+    img.style.height = '64px';
+    img.style.margin = '4px';
+    img.style.imageRendering = 'pixelated';
+    thumbs.appendChild(img);
+
+    await new Promise(resolve => {
+      img.onload = () => {
+        frames.push(img);
+        resolve();
+      };
     });
+  }
 
-    generate.addEventListener('click', () => {
-      if (images.length === 0) return;
+  if (frames.length > 0) {
+    canvas.width = frames[0].width;
+    canvas.height = frames[0].height;
+    animate();
+  }
 
-      status.textContent = "⏳ Génération du GIF...";
+  status.textContent = `✅ ${frames.length} image(s) prêtes.`;
+});
 
-      const gif = new GIF({
-        workers: 2,
-        quality: 1,
-        transparent: 'rgba(0,0,0,0)',
-        workerScript: 'https://cdn.jsdelivr.net/npm/gif.js.optimized/dist/gif.worker.js'
-      });
+function animate() {
+  if (timer) clearInterval(timer);
+  timer = setInterval(() => {
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    ctx.drawImage(frames[currentFrame], 0, 0);
+    currentFrame = (currentFrame + 1) % frames.length;
+  }, parseInt(delayInput.value));
+}
 
-      const canvas = document.createElement('canvas');
-      const ctx = canvas.getContext('2d');
+delayInput.addEventListener('input', () => {
+  if (frames.length > 0) animate();
+});
+</script>
 
-      const w = images[0].width;
-      const h = images[0].height;
-      canvas.width = w;
-      canvas.height = h;
-
-      for (const img of images) {
-        ctx.clearRect(0, 0, w, h);
-        ctx.drawImage(img, 0, 0);
-        gif.addFrame(ctx, { copy: true, delay: parseInt(delay.value) });
-      }
-
-      gif.on('finished', blob => {
-        const url = URL.createObjectURL(blob);
-        result.src = url;
-        result.style.display = 'inline-block';
-        download.href = url;
-        download.style.display = 'inline-block';
-        status.textContent = "✅ GIF généré !";
-      });
-
-      gif.render();
-    });
-  </script>
 </body>
 </html>
