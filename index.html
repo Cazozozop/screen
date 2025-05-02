@@ -2,7 +2,7 @@
 <html lang="fr">
 <head>
   <meta charset="UTF-8">
-  <title>GIF Pixel Art</title>
+  <title>GIF pixelisé</title>
   <style>
     body {
       background: #111;
@@ -10,13 +10,21 @@
       font-family: sans-serif;
       padding: 20px;
     }
-    img {
+    img.preview {
       image-rendering: pixelated;
-      max-height: 100px;
-      margin: 5px;
+      width: auto;
+      height: 64px;
+      margin: 4px;
+      border: 1px solid #444;
+      background: #222;
     }
     canvas {
       display: none;
+    }
+    #thumbs {
+      display: flex;
+      flex-wrap: wrap;
+      margin-top: 10px;
     }
   </style>
 </head>
@@ -25,12 +33,13 @@
 
   <input type="file" id="images" multiple accept="image/*"><br>
   <label>Vitesse (ms/image) : </label>
-  <input type="number" id="delay" value="200"><br>
-  <button id="generate">🎞️ Générer le GIF</button>
+  <input type="number" id="delay" value="200"><br><br>
+  <button id="generate" disabled>🎞️ Générer le GIF</button>
+
   <div id="thumbs"></div>
   <p id="status"></p>
   <img id="result" />
-  <a id="download" download="gif_pixel.gif" style="display:none">📥 Télécharger le GIF</a>
+  <br><a id="download" download="gif_pixel.gif" style="display:none">📥 Télécharger le GIF</a>
 
   <script src="https://cdn.jsdelivr.net/npm/gif.js.optimized/dist/gif.js"></script>
   <script>
@@ -44,57 +53,58 @@
 
     let images = [];
 
-    input.addEventListener('change', () => {
+    input.addEventListener('change', async () => {
       thumbs.innerHTML = '';
       images = [];
+      generate.disabled = true;
+      status.textContent = "🖼️ Chargement des images...";
 
       const files = Array.from(input.files).sort((a, b) =>
         a.name.localeCompare(b.name, undefined, { numeric: true })
       );
 
-      files.forEach(file => {
-        const reader = new FileReader();
-        reader.onload = e => {
-          const img = new Image();
-          img.src = e.target.result;
+      for (const file of files) {
+        const img = new Image();
+        img.classList.add('preview');
+        img.src = URL.createObjectURL(file);
+        await new Promise((resolve) => {
           img.onload = () => {
             images.push(img);
+            thumbs.appendChild(img);
+            resolve();
           };
-          img.style.imageRendering = "pixelated";
-          thumbs.appendChild(img);
-        };
-        reader.readAsDataURL(file);
-      });
+        });
+      }
+
+      status.textContent = `✅ ${images.length} image(s) prêtes.`;
+      generate.disabled = false;
     });
 
     generate.addEventListener('click', () => {
-      if (images.length === 0) {
-        status.textContent = "⚠️ Importe d'abord des images.";
-        return;
-      }
+      if (images.length === 0) return;
 
       status.textContent = "⏳ Génération du GIF...";
 
       const gif = new GIF({
         workers: 2,
         quality: 1,
-        transparent: 'rgba(0,0,0,0)', // gère la transparence
+        transparent: 'rgba(0,0,0,0)',
         workerScript: 'https://cdn.jsdelivr.net/npm/gif.js.optimized/dist/gif.worker.js'
       });
 
       const canvas = document.createElement('canvas');
-      const ctx = canvas.getContext('2d', { willReadFrequently: true });
+      const ctx = canvas.getContext('2d');
 
       const w = images[0].width;
       const h = images[0].height;
       canvas.width = w;
       canvas.height = h;
 
-      images.forEach(img => {
+      for (const img of images) {
         ctx.clearRect(0, 0, w, h);
         ctx.drawImage(img, 0, 0);
         gif.addFrame(ctx, { copy: true, delay: parseInt(delay.value) });
-      });
+      }
 
       gif.on('finished', blob => {
         const url = URL.createObjectURL(blob);
